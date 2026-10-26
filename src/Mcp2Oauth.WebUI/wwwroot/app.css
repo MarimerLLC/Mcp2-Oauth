@@ -59,6 +59,19 @@ h1:focus {
     text-align: start;
 }
 /* Demo chat + identity panels */
+.page-error {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+
+@media (min-width: 641px) {
+    /* Below the sticky top row (3.5rem, see MainLayout.razor.css). */
+    .page-error {
+        top: 3.75rem;
+    }
+}
+
 .top-row form {
     display: inline;
 }
@@ -92,6 +105,11 @@ h1:focus {
 .chat-assistant {
     align-self: flex-start;
     background: #f4f4f4;
+}
+
+.chat-blocked {
+    opacity: 0.75;
+    border: 1px dashed #d39e00;
 }
 
 .chat-meta {
