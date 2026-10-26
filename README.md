@@ -32,6 +32,7 @@ rely on that user's claims (`oid`, `roles`) for data access and authorization.
 | `Mcp2Oauth.Contracts` | | Shared DTOs. |
 | `Mcp2Oauth.AppHost` | dashboard URL printed at startup | Aspire AppHost: runs all three services and the dashboard. |
 | `Mcp2Oauth.ServiceDefaults` | | OpenTelemetry, health checks and resilience shared by the services. |
+| `Mcp2Oauth.McpServer.Tests` | | xUnit tests for the MCP server, run in memory. |
 
 ## How the agent authenticates (and why not a PAT)
 
@@ -73,6 +74,14 @@ attested `azp` so you can see the difference.
 4. **Spec discovery.** An unauthenticated request gets
    `401` + `WWW-Authenticate: Bearer resource_metadata="…/.well-known/oauth-protected-resource/mcp"`,
    and that document names the Entra tenant as the authorization server.
+5. **An audit trail with both identities.** Every expense submission and approval is
+   recorded in an append-only audit log, and so is every refused attempt (self-approval,
+   approving twice, an invalid amount). Each entry names the user *and* the agent that
+   acted for them, plus the trace id. The tools still never see the agent:
+   they report what happened to `ExpenseAudit`, which adds both identities from the
+   middleware's `CallerIdentity`. The `get_audit_log` tool needs the `Expense.Auditor`
+   role. That role is separate from `Expense.Approver`, so reviewing approvals and making
+   them can go to different people.
 
 ## Setup
 
@@ -82,14 +91,16 @@ You need rights to create app registrations and grant admin consent in the tenan
 
 ```powershell
 az login --tenant <your-tenant-id-or-domain> --allow-no-subscriptions
-./setup/Setup-Entra.ps1 -AssignApproverToMe
+./setup/Setup-Entra.ps1 -AssignApproverToMe -AssignAuditorToMe
 ```
 
 The script is idempotent. It creates three registrations (`Mcp2Oauth MCP Server`,
 `Mcp2Oauth Agent`, `Mcp2Oauth Web UI`), configures v2 tokens, scopes, app roles and the
 `idtyp` optional claim, grants admin consent, and writes all ids and secrets to each
 project's **user secrets**. Nothing tenant-specific is committed. `-AssignApproverToMe`
-gives you the `Expense.Approver` role so the approval tools appear for you.
+gives you the `Expense.Approver` role so the approval tools appear for you, and
+`-AssignAuditorToMe` gives you `Expense.Auditor` for the audit log. Sign out and back in
+after a role change, so your token picks it up.
 
 ### 2. Azure OpenAI (for chat)
 
@@ -122,10 +133,27 @@ Open https://localhost:7103, sign in, and:
 - **Probe identity** in each mode. Compare the token claims, what the middleware saw,
   and which tools are visible.
 - Chat in **OBO** mode: "List my expenses", "Submit a $45 expense for a team lunch",
-  "What's waiting for my approval?".
+  "What's waiting for my approval?", "Approve expense 2", then "Approve my team lunch
+  expense" (refused, because it's yours).
+- Ask "Show the audit log". The approval and the refused self-approval are both there,
+  each with your user and the agent's app id.
 - Switch to **Agent only** and ask "List my expenses". The agent can't see that tool,
   and says so. "What's the service status?" still works.
 - Watch the identity flow in the Aspire dashboard (see below).
+
+## Tests
+
+```powershell
+dotnet test
+```
+
+`tests/Mcp2Oauth.McpServer.Tests` hosts the real MCP server in memory and calls its tools
+with the MCP client, so it needs no Entra tenant or Azure OpenAI and runs in CI. A test
+authentication handler stands in for Entra's JWT validation: each test client presents
+the claims of an OBO or app-only token (`azp`, `oid`, `scp`, `roles`…), and everything
+after authentication is the production code. The tests cover the audit trail (successful
+and refused submissions and approvals, both identities on every entry) and who can see
+`get_audit_log`.
 
 ## Observability (Aspire + OpenTelemetry)
 
@@ -134,8 +162,8 @@ service and exports them to the Aspire dashboard over OTLP.
 
 | Dashboard view | What to look for |
 |---|---|
-| **Structured logs** (`mcpserver`) | The middleware's `… agent {AgentName} on behalf of {UserName}` entries, with `AgentAppId`, `UserObjectId`, `McpMethod` and `McpName` as filterable properties. |
-| **Traces** | One trace per chat message: `webui` → `agent` `POST /api/chat` → `Acquire MCP token (on-behalf-of)` or `(client credentials)` → MCP calls (`Experimental.ModelContextProtocol`) → `mcpserver` → Azure OpenAI `chat` spans (`Experimental.Microsoft.Extensions.AI`, which include prompts and tool arguments in Development). The `mcpserver` request spans carry `mcp2oauth.agent.*`, `mcp2oauth.token_kind`, `user.id` and `user.name` tags. |
+| **Structured logs** (`mcpserver`) | The middleware's `… agent {AgentName} on behalf of {UserName}` entries, with `AgentAppId`, `UserObjectId`, `McpMethod` and `McpName` as filterable properties. Audit entries (`Audit #{AuditSequence}: {AuditAction} {AuditOutcome} …`) log at Information, or Warning when the action was refused. |
+| **Traces** | One trace per chat message: `webui` → `agent` `POST /api/chat` → `Acquire MCP token (on-behalf-of)` or `(client credentials)` → MCP calls (`Experimental.ModelContextProtocol`) → `mcpserver` → Azure OpenAI `chat` spans (`Experimental.Microsoft.Extensions.AI`, which include prompts and tool arguments in Development). The `mcpserver` request spans carry `mcp2oauth.agent.*`, `mcp2oauth.token_kind`, `user.id` and `user.name` tags, and spans that wrote an audit entry carry `mcp2oauth.audit.sequence` and `mcp2oauth.audit.outcome`. Each audit entry stores its `TraceId`, so you can go from an entry to its trace and back. |
 | **Metrics** (`mcpserver`) | `mcp2oauth.mcp.requests`, by agent, token kind, MCP method, tool name and outcome (`allowed` or `rejected_agent`). The user is deliberately left off metric tags so the series count stays low. |
 | **Metrics** (`agent`, `webui`) | `MicrosoftIdentityClient_Common_Meter`: MSAL token acquisitions and durations, showing cache hits versus calls to Entra. Plus the MCP SDK and gen_ai client metrics. |
 

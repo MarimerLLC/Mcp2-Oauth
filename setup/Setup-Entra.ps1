@@ -11,6 +11,7 @@
                               - Delegated scope  Mcp.Tools        (agent acting for a user)
                               - App role         Mcp.Status.Read  (Application: agent acting as itself)
                               - App role         Expense.Approver (User: assigned to people)
+                              - App role         Expense.Auditor  (User: assigned to people)
                               - Optional claim   idtyp            (marks app-only vs user tokens)
 
       Mcp2Oauth Agent       The agent. A protected API (scope Agent.Chat) AND a confidential
@@ -33,6 +34,10 @@
     Assign the signed-in user the Expense.Approver role on the MCP server, so the
     approval tools show up for them.
 
+.PARAMETER AssignAuditorToMe
+    Assign the signed-in user the Expense.Auditor role on the MCP server, so the
+    audit log tool shows up for them.
+
 .PARAMETER RotateSecrets
     Always create new client secrets for the agent and web UI apps.
 #>
@@ -41,6 +46,7 @@ param(
     [string] $Prefix = "Mcp2Oauth",
     [string] $WebUiUrl = "https://localhost:7103",
     [switch] $AssignApproverToMe,
+    [switch] $AssignAuditorToMe,
     [switch] $RotateSecrets
 )
 
@@ -217,11 +223,13 @@ $statusRole = New-AppRole $mcpApp.appRoles "Mcp.Status.Read" @("Application") `
     "Read MCP service status" "Allows an agent to read service status without a signed-in user."
 $approverRole = New-AppRole $mcpApp.appRoles "Expense.Approver" @("User") `
     "Expense approver" "Can approve other people's expense reports."
+$auditorRole = New-AppRole $mcpApp.appRoles "Expense.Auditor" @("User") `
+    "Expense auditor" "Can read the audit log of expense submissions and approvals."
 
 Invoke-Graph PATCH "$graph/applications/$($mcpApp.id)" @{
     identifierUris = @("api://$($mcpApp.appId)")
     api            = @{ requestedAccessTokenVersion = 2; oauth2PermissionScopes = @($mcpScope) }
-    appRoles       = @($statusRole, $approverRole)
+    appRoles       = @($statusRole, $approverRole, $auditorRole)
     optionalClaims = @{ accessToken = @(@{ name = "idtyp"; essential = $false }) }
 } | Out-Null
 $mcpSp = Get-OrCreateServicePrincipal $mcpApp.appId
@@ -302,6 +310,11 @@ $webSecret = Get-ClientSecret $webApp.id $projects.WebUI
 if ($AssignApproverToMe) {
     Write-Host "`nAssigning Expense.Approver to $($me.userPrincipalName)"
     Grant-AppRole $me.id $mcpSp.id $approverRole.id "$graph/users/$($me.id)/appRoleAssignments"
+}
+
+if ($AssignAuditorToMe) {
+    Write-Host "`nAssigning Expense.Auditor to $($me.userPrincipalName)"
+    Grant-AppRole $me.id $mcpSp.id $auditorRole.id "$graph/users/$($me.id)/appRoleAssignments"
 }
 
 #region user secrets

@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using Mcp2Oauth.McpServer.Audit;
 using Mcp2Oauth.McpServer.Data;
 using Microsoft.AspNetCore.Authorization;
 using ModelContextProtocol.Server;
@@ -9,7 +10,7 @@ namespace Mcp2Oauth.McpServer.Tools;
 /// A tool that doesn't need a user, so an app-only agent can call it too.
 /// </summary>
 [McpServerToolType]
-public sealed class StatusTools(ExpenseStore store, TimeProvider time)
+public sealed class StatusTools(ExpenseStore store, AuditLog auditLog, TimeProvider time)
 {
     [McpServerTool(Name = "get_service_status", ReadOnly = true)]
     [Authorize(Policy = Policies.StatusReader)]
@@ -20,5 +21,6 @@ public sealed class StatusTools(ExpenseStore store, TimeProvider time)
         ServerTimeUtc = time.GetUtcNow(),
         TotalExpenses = store.Count,
         PendingExpenses = store.Pending().Count,
+        AuditEntries = auditLog.Count,
     };
 }
