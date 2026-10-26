@@ -8,6 +8,8 @@ using Microsoft.Identity.Web;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.AddServiceDefaults();
+
 var agentSettings = builder.Configuration.GetSection(AgentSettings.SectionName).Get<AgentSettings>() ?? new();
 builder.Services.Configure<AgentSettings>(builder.Configuration.GetSection(AgentSettings.SectionName));
 
@@ -26,7 +28,17 @@ builder.Services.Configure<CookieAuthenticationOptions>(CookieAuthenticationDefa
 builder.Services.AddAuthorization();
 builder.Services.AddCascadingAuthenticationState();
 
-builder.Services.AddHttpClient<AgentClient>(client => client.BaseAddress = new Uri(agentSettings.BaseUrl));
+// A chat request spans a whole LLM tool loop, which outlasts the standard
+// resilience handler's 10 second attempt timeout, so use a plain long timeout.
+// (RemoveAllResilienceHandlers is marked experimental: EXTEXP0001.)
+#pragma warning disable EXTEXP0001
+builder.Services.AddHttpClient<AgentClient>(client =>
+    {
+        client.BaseAddress = new Uri(agentSettings.BaseUrl);
+        client.Timeout = TimeSpan.FromMinutes(3);
+    })
+    .RemoveAllResilienceHandlers();
+#pragma warning restore EXTEXP0001
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
@@ -45,6 +57,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery();
 
+app.MapDefaultEndpoints();
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();

@@ -7,6 +7,8 @@ using ModelContextProtocol.AspNetCore.Authentication;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.AddServiceDefaults();
+
 var settings = builder.Configuration.GetSection(McpServerSettings.SectionName).Get<McpServerSettings>() ?? new();
 builder.Services.Configure<McpServerSettings>(builder.Configuration.GetSection(McpServerSettings.SectionName));
 
@@ -47,6 +49,7 @@ builder.Services.AddAuthorization(Policies.Add);
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IUserContext, HttpUserContext>();
+builder.Services.AddSingleton<CallerTelemetry>();
 builder.Services.AddSingleton<ExpenseStore>();
 builder.Services.AddSingleton(TimeProvider.System);
 
@@ -69,6 +72,7 @@ app.UseWhen(
     context => context.Request.Path.StartsWithSegments("/mcp"),
     branch => branch.UseMiddleware<CallerIdentityMiddleware>());
 
+app.MapDefaultEndpoints();
 app.MapGet("/", () => "Mcp2Oauth MCP server. The MCP endpoint is /mcp.");
 app.MapMcp("/mcp").RequireAuthorization();
 

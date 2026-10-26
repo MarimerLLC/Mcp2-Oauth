@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net.Http.Headers;
 using Mcp2Oauth.Contracts;
 using Microsoft.Identity.Abstractions;
@@ -33,22 +34,38 @@ public sealed class McpConnector(
     Microsoft.Extensions.Options.IOptions<McpSettings> settings,
     ILoggerFactory loggerFactory)
 {
+    /// <summary>Matches the application name, which ServiceDefaults registers as a trace source.</summary>
+    public static readonly ActivitySource ActivitySource = new("Mcp2Oauth.Agent");
+
     private static readonly string[] InterestingClaims =
         ["aud", "iss", "azp", "appid", "idtyp", "oid", "name", "preferred_username", "scp", "roles", "exp"];
 
     public async Task<McpSession> ConnectAsync(CallMode mode, CancellationToken cancellationToken)
     {
         var mcp = settings.Value;
-        var header = mode switch
-        {
-            CallMode.OnBehalfOf => await authorizationHeaders.CreateAuthorizationHeaderForUserAsync(
-                [$"{mcp.Audience}/Mcp.Tools"], cancellationToken: cancellationToken),
-            CallMode.AppOnly => await authorizationHeaders.CreateAuthorizationHeaderForAppAsync(
-                $"{mcp.Audience}/.default", cancellationToken: cancellationToken),
-            _ => throw new ArgumentOutOfRangeException(nameof(mode)),
-        };
 
-        var authorization = AuthenticationHeaderValue.Parse(header);
+        // A span per token acquisition, so the trace shows which OAuth flow ran.
+        // On a cache miss MSAL's call to Entra appears as a child HTTP span.
+        AuthenticationHeaderValue authorization;
+        using (var activity = ActivitySource.StartActivity(
+            mode == CallMode.OnBehalfOf ? "Acquire MCP token (on-behalf-of)" : "Acquire MCP token (client credentials)"))
+        {
+            activity?.SetTag("mcp2oauth.call_mode", mode.ToString());
+            var header = mode switch
+            {
+                CallMode.OnBehalfOf => await authorizationHeaders.CreateAuthorizationHeaderForUserAsync(
+                    [$"{mcp.Audience}/Mcp.Tools"], cancellationToken: cancellationToken),
+                CallMode.AppOnly => await authorizationHeaders.CreateAuthorizationHeaderForAppAsync(
+                    $"{mcp.Audience}/.default", cancellationToken: cancellationToken),
+                _ => throw new ArgumentOutOfRangeException(nameof(mode)),
+            };
+            authorization = AuthenticationHeaderValue.Parse(header);
+
+            var token = new JsonWebToken(authorization.Parameter!);
+            activity?.SetTag("mcp2oauth.token.azp", token.TryGetPayloadValue<string>("azp", out var azp) ? azp : null);
+            activity?.SetTag("mcp2oauth.token.idtyp", token.TryGetPayloadValue<string>("idtyp", out var idtyp) ? idtyp : null);
+        }
+
         var http = httpClientFactory.CreateClient("mcp");
         http.DefaultRequestHeaders.Authorization = authorization;
 

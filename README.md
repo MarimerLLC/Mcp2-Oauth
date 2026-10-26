@@ -30,6 +30,8 @@ rely on that user's claims (`oid`, `roles`) for data access and authorization.
 | `Mcp2Oauth.Agent` | https://localhost:7102 | The agent. Protected API + confidential client. Runs the LLM tool loop. |
 | `Mcp2Oauth.McpServer` | https://localhost:7101/mcp | MCP server (Streamable HTTP, stateless). |
 | `Mcp2Oauth.Contracts` | | Shared DTOs. |
+| `Mcp2Oauth.AppHost` | dashboard URL printed at startup | Aspire AppHost: runs all three services and the dashboard. |
+| `Mcp2Oauth.ServiceDefaults` | | OpenTelemetry, health checks and resilience shared by the services. |
 
 ## How the agent authenticates (and why not a PAT)
 
@@ -105,13 +107,15 @@ dotnet user-secrets set AzureOpenAI:ApiKey     <key>
 
 ### 3. Run
 
-Start all three projects (in Visual Studio, use multiple startup projects):
+Start everything with Aspire, either the `Mcp2Oauth.AppHost` project in Visual Studio or:
 
 ```powershell
-dotnet run --project src/Mcp2Oauth.McpServer --launch-profile https
-dotnet run --project src/Mcp2Oauth.Agent     --launch-profile https
-dotnet run --project src/Mcp2Oauth.WebUI     --launch-profile https
+dotnet run --project src/Mcp2Oauth.AppHost
 ```
+
+The console prints the Aspire dashboard's login URL. The services keep their fixed ports
+(7101-7103), which the Entra registrations depend on. You can still run each project on its
+own with `dotnet run --launch-profile https`. Telemetry is then simply not exported.
 
 Open https://localhost:7103, sign in, and:
 
@@ -121,7 +125,24 @@ Open https://localhost:7103, sign in, and:
   "What's waiting for my approval?".
 - Switch to **Agent only** and ask "List my expenses". The agent can't see that tool,
   and says so. "What's the service status?" still works.
-- Watch the MCP server console for the middleware's identity log lines.
+- Watch the identity flow in the Aspire dashboard (see below).
+
+## Observability (Aspire + OpenTelemetry)
+
+`Mcp2Oauth.ServiceDefaults` configures OpenTelemetry logs, traces and metrics for every
+service and exports them to the Aspire dashboard over OTLP.
+
+| Dashboard view | What to look for |
+|---|---|
+| **Structured logs** (`mcpserver`) | The middleware's `… agent {AgentName} on behalf of {UserName}` entries, with `AgentAppId`, `UserObjectId`, `McpMethod` and `McpName` as filterable properties. |
+| **Traces** | One trace per chat message: `webui` → `agent` `POST /api/chat` → `Acquire MCP token (on-behalf-of)` or `(client credentials)` → MCP calls (`Experimental.ModelContextProtocol`) → `mcpserver` → Azure OpenAI `chat` spans (`Experimental.Microsoft.Extensions.AI`, which include prompts and tool arguments in Development). The `mcpserver` request spans carry `mcp2oauth.agent.*`, `mcp2oauth.token_kind`, `user.id` and `user.name` tags. |
+| **Metrics** (`mcpserver`) | `mcp2oauth.mcp.requests`, by agent, token kind, MCP method, tool name and outcome (`allowed` or `rejected_agent`). The user is deliberately left off metric tags so the series count stays low. |
+| **Metrics** (`agent`, `webui`) | `MicrosoftIdentityClient_Common_Meter`: MSAL token acquisitions and durations, showing cache hits versus calls to Entra. Plus the MCP SDK and gen_ai client metrics. |
+
+Retries are disabled for POSTs in the shared resilience handler, so a tool call like
+`submit_expense` is never sent twice. The web UI's call to the agent opts out of the
+standard handler and uses a longer timeout, because one chat request covers a whole LLM
+tool loop.
 
 ## Notes
 

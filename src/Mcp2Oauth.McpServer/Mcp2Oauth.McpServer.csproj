@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Mcp2Oauth.Contracts\Mcp2Oauth.Contracts.csproj" />
+    <ProjectReference Include="..\Mcp2Oauth.ServiceDefaults\Mcp2Oauth.ServiceDefaults.csproj" />
   </ItemGroup>
 
 </Project>

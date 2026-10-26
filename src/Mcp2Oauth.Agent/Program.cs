@@ -9,6 +9,8 @@ using Microsoft.Identity.Web;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.AddServiceDefaults();
+
 // The agent is both a protected API (the web UI calls it with a user token) and
 // a confidential client with its own credential, which it uses for OBO and
 // client credentials calls to the MCP server.
@@ -46,8 +48,11 @@ if (openAi["Endpoint"] is { Length: > 0 } endpoint && openAi["Deployment"] is { 
         ? new AzureOpenAIClient(new Uri(endpoint), new AzureKeyCredential(apiKey))
         : new AzureOpenAIClient(new Uri(endpoint), new DefaultAzureCredential());
 
+    // OpenTelemetry sits inside function invocation, so each model round trip is
+    // its own gen_ai span. Prompts and tool arguments are recorded in Development only.
     builder.Services.AddChatClient(azureClient.GetChatClient(deployment).AsIChatClient())
         .UseFunctionInvocation()
+        .UseOpenTelemetry(configure: otel => otel.EnableSensitiveData = builder.Environment.IsDevelopment())
         .UseLogging();
 }
 
@@ -75,6 +80,7 @@ api.MapPost("/probe", (CallMode mode, AgentService agent, CancellationToken ct) 
 api.MapPost("/chat", (AgentChatRequest request, AgentService agent, CancellationToken ct) =>
     agent.ChatAsync(request, ct));
 
+app.MapDefaultEndpoints();
 app.MapGet("/", () => "Mcp2Oauth agent service.");
 
 app.Run();

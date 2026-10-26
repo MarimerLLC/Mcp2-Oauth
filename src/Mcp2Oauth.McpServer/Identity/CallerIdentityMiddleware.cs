@@ -17,6 +17,7 @@ namespace Mcp2Oauth.McpServer.Identity;
 public sealed class CallerIdentityMiddleware(
     RequestDelegate next,
     IOptionsMonitor<McpServerSettings> settings,
+    CallerTelemetry telemetry,
     ILogger<CallerIdentityMiddleware> logger)
 {
     public async Task InvokeAsync(HttpContext context)
@@ -55,6 +56,8 @@ public sealed class CallerIdentityMiddleware(
 
         var mcpMethod = context.Request.Headers["Mcp-Method"].ToString();
         var mcpName = context.Request.Headers["Mcp-Name"].ToString();
+
+        telemetry.Record(caller, mcpMethod, mcpName, agent.IsAllowed);
 
         if (!agent.IsAllowed)
         {

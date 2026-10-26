@@ -1,0 +1,18 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.6.4">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Mcp2Oauth.McpServer\Mcp2Oauth.McpServer.csproj" />
+    <ProjectReference Include="..\Mcp2Oauth.Agent\Mcp2Oauth.Agent.csproj" />
+    <ProjectReference Include="..\Mcp2Oauth.WebUI\Mcp2Oauth.WebUI.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AspireUseCliBundle>true</AspireUseCliBundle>
+    <UserSecretsId>53f3b719-4168-4a53-a602-99f6d0bd3073</UserSecretsId>
+  </PropertyGroup>
+
+</Project>
