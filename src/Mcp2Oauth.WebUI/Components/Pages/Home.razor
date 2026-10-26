@@ -97,7 +97,14 @@
                             <span class="badge text-bg-warning ms-1">blocked by content filter</span>
                         }
                     </div>
-                    <div class="chat-text">@entry.Turn.Text</div>
+                    @if (entry.Turn.Role == "user")
+                    {
+                        <div class="chat-text">@entry.Turn.Text</div>
+                    }
+                    else
+                    {
+                        <div class="chat-markdown">@ChatMarkdown.ToHtml(entry.Turn.Text)</div>
+                    }
                     @foreach (var call in entry.ToolCalls)
                     {
                         <details class="tool-call">

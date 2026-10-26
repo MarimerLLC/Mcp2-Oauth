@@ -121,6 +121,37 @@ h1:focus {
     white-space: pre-wrap;
 }
 
+.chat-markdown > :last-child {
+    margin-bottom: 0;
+}
+
+.chat-markdown p,
+.chat-markdown ul,
+.chat-markdown ol,
+.chat-markdown pre {
+    margin-bottom: 0.5rem;
+}
+
+.chat-markdown table {
+    margin-bottom: 0.5rem;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.chat-markdown th,
+.chat-markdown td {
+    border: 1px solid #d6d5d5;
+    padding: 0.2rem 0.5rem;
+}
+
+.chat-markdown th {
+    background: #ebebeb;
+}
+
+.chat-markdown pre {
+    white-space: pre-wrap;
+}
+
 .tool-call {
     font-size: 0.85rem;
     margin-top: 0.25rem;
