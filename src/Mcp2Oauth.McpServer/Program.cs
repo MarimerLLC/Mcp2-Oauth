@@ -1,5 +1,6 @@
 using Mcp2Oauth.McpServer;
 using Mcp2Oauth.McpServer.Audit;
+using Mcp2Oauth.McpServer.AutoApproval;
 using Mcp2Oauth.McpServer.Data;
 using Mcp2Oauth.McpServer.Identity;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -23,7 +24,11 @@ var authentication = builder.Services.AddAuthentication(options =>
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
     options.DefaultChallengeScheme = McpAuthenticationDefaults.AuthenticationScheme;
 });
-authentication.AddMicrosoftIdentityWebApi(builder.Configuration, "AzureAd");
+authentication.AddMicrosoftIdentityWebApi(builder.Configuration, "AzureAd")
+    // The server's own credential (AzureAd:ClientCredentials). Only the expense
+    // policy uses it, to call the decision model as itself.
+    .EnableTokenAcquisitionToCallDownstreamApi()
+    .AddInMemoryTokenCaches();
 authentication.AddMcp(options =>
 {
     options.ResourceMetadata = new()
@@ -54,6 +59,9 @@ builder.Services.AddSingleton<CallerTelemetry>();
 builder.Services.AddSingleton<ExpenseStore>();
 builder.Services.AddSingleton<AuditLog>();
 builder.Services.AddScoped<ExpenseAudit>();
+builder.Services.Configure<ExpensePolicySettings>(builder.Configuration.GetSection(ExpensePolicySettings.SectionName));
+builder.Services.AddHttpClient<IExpenseClassifier, DecisionModelClassifier>();
+builder.Services.AddScoped<ExpensePolicy>();
 builder.Services.AddSingleton(TimeProvider.System);
 
 builder.Services.AddMcpServer(options =>

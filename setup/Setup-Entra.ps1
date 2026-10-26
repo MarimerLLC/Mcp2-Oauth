@@ -13,6 +13,8 @@
                               - App role         Expense.Approver (User: assigned to people)
                               - App role         Expense.Auditor  (User: assigned to people)
                               - Optional claim   idtyp            (marks app-only vs user tokens)
+                            With -DecisionModelResourceId, also a confidential client with its
+                            own secret, so its expense policy can call the decision model as itself.
 
       Mcp2Oauth Agent       The agent. A protected API (scope Agent.Chat) AND a confidential
                             client with its own secret. Has admin consent for Mcp.Tools
@@ -39,7 +41,18 @@
     audit log tool shows up for them.
 
 .PARAMETER RotateSecrets
-    Always create new client secrets for the agent and web UI apps.
+    Always create new client secrets for the agent and web UI apps, and for the MCP server
+    when -DecisionModelResourceId is given.
+
+.PARAMETER DecisionModelResourceId
+    The Azure resource id of a Foundry (AIServices) resource with a Microsoft-Decision-1
+    deployment, for expense auto-approval. The MCP server gets its own client secret and the
+    Cognitive Services User role on that resource, and its user secrets get the endpoint and
+    deployment. Assigning the role needs Owner or User Access Administrator on the resource.
+    Without it, auto-approval stays off and every expense waits for a human.
+
+.PARAMETER DecisionModelDeployment
+    The name of the Microsoft-Decision-1 deployment on that resource. Default: decision-1.
 #>
 [CmdletBinding()]
 param(
@@ -47,7 +60,9 @@ param(
     [string] $WebUiUrl = "https://localhost:7103",
     [switch] $AssignApproverToMe,
     [switch] $AssignAuditorToMe,
-    [switch] $RotateSecrets
+    [switch] $RotateSecrets,
+    [string] $DecisionModelResourceId,
+    [string] $DecisionModelDeployment = "decision-1"
 )
 
 $ErrorActionPreference = "Stop"
@@ -307,6 +322,32 @@ $webSecret = Get-ClientSecret $webApp.id $projects.WebUI
 
 #endregion
 
+#region Decision model (optional): the MCP server calls Foundry as itself
+
+if ($DecisionModelResourceId) {
+    Write-Host "`nDecision model"
+    $account = az resource show --ids $DecisionModelResourceId -o json | Out-String | ConvertFrom-Json
+    $decisionEndpoint = $account.properties.endpoints.'AI Foundry API'
+    if (-not $decisionEndpoint) { throw "Resource '$($account.name)' has no AI Foundry API endpoint." }
+    Write-Host "  Foundry resource '$($account.name)': $decisionEndpoint, deployment '$DecisionModelDeployment'"
+
+    $role = "Cognitive Services User"
+    $assigned = az role assignment list --assignee $mcpSp.id --role $role --scope $DecisionModelResourceId -o json |
+        Out-String | ConvertFrom-Json
+    if ($assigned) {
+        Write-Host "  The MCP server already has $role on the resource"
+    }
+    else {
+        Write-Host "  Assigning $role on the resource to the MCP server (can take a few minutes to apply)"
+        az role assignment create --assignee-object-id $mcpSp.id --assignee-principal-type ServicePrincipal `
+            --role $role --scope $DecisionModelResourceId | Out-Null
+    }
+
+    $mcpSecret = Get-ClientSecret $mcpApp.id $projects.McpServer
+}
+
+#endregion
+
 if ($AssignApproverToMe) {
     Write-Host "`nAssigning Expense.Approver to $($me.userPrincipalName)"
     Grant-AppRole $me.id $mcpSp.id $approverRole.id "$graph/users/$($me.id)/appRoleAssignments"
@@ -325,6 +366,14 @@ Set-UserSecrets $projects.McpServer @{
     "AzureAd:ClientId"                           = $mcpApp.appId
     "AzureAd:Audience"                           = "api://$($mcpApp.appId)"
     "McpServer:AllowedAgents:$($agentApp.appId)" = "$Prefix Agent"
+}
+if ($DecisionModelResourceId) {
+    Set-UserSecrets $projects.McpServer @{
+        "AzureAd:ClientCredentials:0:SourceType"   = "ClientSecret"
+        "AzureAd:ClientCredentials:0:ClientSecret" = $mcpSecret
+        "ExpensePolicy:Endpoint"                   = $decisionEndpoint
+        "ExpensePolicy:Deployment"                 = $DecisionModelDeployment
+    }
 }
 Set-UserSecrets $projects.Agent @{
     "AzureAd:TenantId"                       = $tenantId

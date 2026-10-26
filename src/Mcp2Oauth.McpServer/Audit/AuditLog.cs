@@ -3,17 +3,22 @@ using System.Text.Json.Serialization;
 namespace Mcp2Oauth.McpServer.Audit;
 
 [JsonConverter(typeof(JsonStringEnumConverter<AuditAction>))]
-public enum AuditAction { SubmitExpense, ApproveExpense }
+public enum AuditAction { SubmitExpense, ApproveExpense, AutoApproveExpense }
 
+/// <summary>
+/// <see cref="Referred"/> is the expense policy declining to auto-approve: the
+/// expense isn't refused, it waits for a human approver.
+/// </summary>
 [JsonConverter(typeof(JsonStringEnumConverter<AuditOutcome>))]
-public enum AuditOutcome { Succeeded, Denied }
+public enum AuditOutcome { Succeeded, Denied, Referred }
 
-/// <summary>Who acted: an Entra object id (user) or app id (agent), and a display name.</summary>
+/// <summary>Who acted: an Entra object id (user) or app id (agent or service), and a display name.</summary>
 public sealed record AuditActor(string Id, string? Name);
 
 /// <summary>
 /// One financial action on an expense, with both identities behind it: the user
-/// it was done for, and the agent that made the call.
+/// it was done for, and the agent that made the call. When the server decided by
+/// itself (the expense policy), <see cref="Service"/> names it as well.
 /// </summary>
 public sealed record AuditEntry(
     long Sequence,
@@ -25,6 +30,7 @@ public sealed record AuditEntry(
     string? ExpenseOwner,
     AuditActor User,
     AuditActor Agent,
+    AuditActor? Service,
     string? Reason,
     string? TraceId);
 
@@ -53,10 +59,10 @@ public sealed class AuditLog
         var start = time.GetUtcNow().AddDays(-3);
         _entries =
         [
-            new(1, start, AuditAction.SubmitExpense, AuditOutcome.Succeeded, 1, 899m, alice.Name, alice, seed, null, null),
-            new(2, start.AddHours(2), AuditAction.SubmitExpense, AuditOutcome.Succeeded, 2, 142.50m, bob.Name, bob, seed, null, null),
-            new(3, start.AddHours(3), AuditAction.SubmitExpense, AuditOutcome.Succeeded, 3, 61m, bob.Name, bob, seed, null, null),
-            new(4, start.AddDays(1), AuditAction.ApproveExpense, AuditOutcome.Succeeded, 3, 61m, bob.Name, carol, seed, null, null),
+            new(1, start, AuditAction.SubmitExpense, AuditOutcome.Succeeded, 1, 899m, alice.Name, alice, seed, null, null, null),
+            new(2, start.AddHours(2), AuditAction.SubmitExpense, AuditOutcome.Succeeded, 2, 142.50m, bob.Name, bob, seed, null, null, null),
+            new(3, start.AddHours(3), AuditAction.SubmitExpense, AuditOutcome.Succeeded, 3, 61m, bob.Name, bob, seed, null, null, null),
+            new(4, start.AddDays(1), AuditAction.ApproveExpense, AuditOutcome.Succeeded, 3, 61m, bob.Name, carol, seed, null, null, null),
         ];
     }
 
@@ -77,11 +83,17 @@ public sealed class AuditLog
             _entries.Add(entry);
         }
 
-        _logger.Log(
-            entry.Outcome == AuditOutcome.Succeeded ? LogLevel.Information : LogLevel.Warning,
-            "Audit #{AuditSequence}: {AuditAction} {AuditOutcome}, expense {ExpenseId} ({Amount} USD) by {UserName} ({UserObjectId}) via agent {AgentName} ({AgentAppId}). {Reason}",
-            entry.Sequence, entry.Action, entry.Outcome, entry.ExpenseId, entry.Amount,
-            entry.User.Name, entry.User.Id, entry.Agent.Name, entry.Agent.Id, entry.Reason);
+        var level = entry.Outcome == AuditOutcome.Denied ? LogLevel.Warning : LogLevel.Information;
+        if (entry.Service is { } service)
+            _logger.Log(level,
+                "Audit #{AuditSequence}: {AuditAction} {AuditOutcome}, expense {ExpenseId} ({Amount} USD) by {ServiceName} ({ServiceAppId}), submitted by {UserName} ({UserObjectId}) via agent {AgentName} ({AgentAppId}). {Reason}",
+                entry.Sequence, entry.Action, entry.Outcome, entry.ExpenseId, entry.Amount, service.Name, service.Id,
+                entry.User.Name, entry.User.Id, entry.Agent.Name, entry.Agent.Id, entry.Reason);
+        else
+            _logger.Log(level,
+                "Audit #{AuditSequence}: {AuditAction} {AuditOutcome}, expense {ExpenseId} ({Amount} USD) by {UserName} ({UserObjectId}) via agent {AgentName} ({AgentAppId}). {Reason}",
+                entry.Sequence, entry.Action, entry.Outcome, entry.ExpenseId, entry.Amount,
+                entry.User.Name, entry.User.Id, entry.Agent.Name, entry.Agent.Id, entry.Reason);
         return entry;
     }
 }

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Mcp2Oauth.McpServer.AutoApproval;
 using Mcp2Oauth.McpServer.Data;
 using Mcp2Oauth.McpServer.Identity;
 using ModelContextProtocol;
@@ -19,6 +20,18 @@ public sealed class ExpenseAudit(IHttpContextAccessor accessor, AuditLog log)
         return expense;
     }
 
+    /// <summary>
+    /// Records the expense policy's decision on a new expense. The server made it
+    /// under its own identity, so the entry names <paramref name="service"/> as well
+    /// as the user and agent behind the submission.
+    /// </summary>
+    public Expense PolicyDecided(Expense expense, PolicyDecision decision, AuditActor service)
+    {
+        var outcome = decision.AutoApprove ? AuditOutcome.Succeeded : AuditOutcome.Referred;
+        Append(AuditAction.AutoApproveExpense, outcome, expense.Id, expense.Amount, expense.OwnerName, decision.Reason, service);
+        return expense;
+    }
+
     /// <summary>Records a refused action and returns the exception for the tool to throw.</summary>
     public McpException Denied(AuditAction action, string reason, Expense expense)
     {
@@ -33,7 +46,7 @@ public sealed class ExpenseAudit(IHttpContextAccessor accessor, AuditLog log)
         return new McpException(reason);
     }
 
-    private void Append(AuditAction action, AuditOutcome outcome, int? expenseId, decimal? amount, string? expenseOwner, string? reason)
+    private void Append(AuditAction action, AuditOutcome outcome, int? expenseId, decimal? amount, string? expenseOwner, string? reason, AuditActor? service = null)
     {
         var caller = accessor.HttpContext?.Features.Get<CallerIdentity>()
             ?? throw new InvalidOperationException("No caller identity was established for this request.");
@@ -51,6 +64,7 @@ public sealed class ExpenseAudit(IHttpContextAccessor accessor, AuditLog log)
             ExpenseOwner: expenseOwner,
             User: new AuditActor(user.ObjectId, user.UserName ?? user.Name),
             Agent: new AuditActor(caller.Agent.AppId, caller.Agent.DisplayName),
+            Service: service,
             Reason: reason,
             TraceId: activity?.TraceId.ToHexString()));
 
