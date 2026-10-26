@@ -31,14 +31,16 @@
             <button class="btn btn-secondary" @onclick="ProbeAsync" disabled="@busy">Probe identity</button>
         </div>
 
+        @* Sticky under the top bar, so it stays visible however far the chat has scrolled. *@
         @if (error is not null)
         {
-            <div class="alert alert-danger">
+            <div class="alert alert-danger alert-dismissible page-error" role="alert">
                 @error
                 @if (signInRequired)
                 {
                     <a class="ms-2" href="authentication/login?returnUrl=/" data-enhance-nav="false">Sign in again</a>
                 }
+                <button type="button" class="btn-close" aria-label="Close" @onclick="() => error = null"></button>
             </div>
         }
 
@@ -83,12 +85,16 @@
         <div class="chat mb-3">
             @foreach (var entry in transcript)
             {
-                <div class="chat-turn @(entry.Turn.Role == "user" ? "chat-user" : "chat-assistant")">
+                <div class="chat-turn @(entry.Turn.Role == "user" ? "chat-user" : "chat-assistant") @(entry.Blocked ? "chat-blocked" : "")">
                     <div class="chat-meta">
                         @(entry.Turn.Role == "user" ? "You" : "Agent")
                         @if (entry.Mode is { } m)
                         {
                             <span class="badge text-bg-light ms-1">@(m == CallMode.OnBehalfOf ? "OBO" : "agent only")</span>
+                        }
+                        @if (entry.Blocked)
+                        {
+                            <span class="badge text-bg-warning ms-1">blocked by content filter</span>
                         }
                     </div>
                     <div class="chat-text">@entry.Turn.Text</div>
@@ -132,7 +138,8 @@
         "What's the service status?",
     ];
 
-    private sealed record TranscriptEntry(ChatTurn Turn, CallMode? Mode, IReadOnlyList<ToolCallTrace> ToolCalls);
+    /// <param name="Blocked">Refused by the content filter: shown, but never sent to the agent again.</param>
+    private sealed record TranscriptEntry(ChatTurn Turn, CallMode? Mode, IReadOnlyList<ToolCallTrace> ToolCalls, bool Blocked = false);
 
     private readonly List<TranscriptEntry> transcript = [];
     private CallMode mode = CallMode.OnBehalfOf;
@@ -156,13 +163,16 @@
             return;
 
         input = null;
-        transcript.Add(new(new ChatTurn("user", text), null, []));
+        var turn = new TranscriptEntry(new ChatTurn("user", text), null, []);
+        transcript.Add(turn);
 
-        var history = transcript.Select(e => e.Turn).ToList();
+        var history = transcript.Where(e => !e.Blocked).Select(e => e.Turn).ToList();
         await RunAsync(async () =>
         {
             var reply = await Agent.ChatAsync(new AgentChatRequest(history, mode));
-            transcript.Add(new(new ChatTurn("assistant", reply.Reply), mode, reply.ToolCalls));
+            if (reply.Blocked)
+                transcript[transcript.IndexOf(turn)] = turn with { Blocked = true };
+            transcript.Add(new(new ChatTurn("assistant", reply.Reply), mode, reply.ToolCalls, reply.Blocked));
         });
     }
 

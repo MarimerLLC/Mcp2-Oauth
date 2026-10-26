@@ -19,11 +19,17 @@ public sealed record ChatTurn(string Role, string Text);
 
 public sealed record AgentChatRequest(IReadOnlyList<ChatTurn> Messages, CallMode Mode);
 
+/// <param name="Blocked">
+/// The model provider's content filter refused the conversation, e.g. as a prompt
+/// injection. The client should leave the refused message out of later requests,
+/// or every following turn is refused too.
+/// </param>
 public sealed record AgentChatResponse(
     string Reply,
     IReadOnlyList<ToolCallTrace> ToolCalls,
     IReadOnlyList<string> AvailableTools,
-    TokenSummary McpToken);
+    TokenSummary McpToken,
+    bool Blocked = false);
 
 public sealed record ToolCallTrace(string Name, string Arguments, string Result);
 

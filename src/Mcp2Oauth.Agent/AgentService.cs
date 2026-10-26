@@ -1,3 +1,4 @@
+using System.ClientModel;
 using System.Text.Json;
 using Mcp2Oauth.Contracts;
 using Microsoft.Extensions.AI;
@@ -52,12 +53,52 @@ public sealed class AgentService(McpConnector connector, IServiceProvider servic
         messages.AddRange(request.Messages.Select(m =>
             new ChatMessage(m.Role == "assistant" ? ChatRole.Assistant : ChatRole.User, m.Text)));
 
-        var response = await chatClient.GetResponseAsync(
-            messages,
-            new ChatOptions { Tools = [.. tools] },
-            cancellationToken);
+        // Record which tools actually run, so a refused request can say whether
+        // anything happened before the refusal.
+        var called = new List<string>();
+        Microsoft.Extensions.AI.ChatResponse response;
+        try
+        {
+            response = await chatClient.GetResponseAsync(
+                messages,
+                new ChatOptions { Tools = [.. tools.Select(t => new RecordingTool(t, called))] },
+                cancellationToken);
+        }
+        catch (ClientResultException ex) when (IsContentFilter(ex))
+        {
+            return new AgentChatResponse(BlockedReply(called), [], ToolNames(tools), session.Token, Blocked: true);
+        }
 
         return new AgentChatResponse(response.Text, TraceToolCalls(response), ToolNames(tools), session.Token);
+    }
+
+    /// <summary>
+    /// Azure OpenAI's content filter, including its jailbreak (prompt injection)
+    /// detection, refuses a request with HTTP 400 and the code content_filter.
+    /// </summary>
+    private static bool IsContentFilter(ClientResultException ex) =>
+        ex.Status == 400 && ex.Message.Contains("content_filter", StringComparison.Ordinal);
+
+    private static string BlockedReply(List<string> called)
+    {
+        lock (called)
+        {
+            return called.Count == 0
+                ? "Azure OpenAI's content filter refused that message as a likely prompt injection, so I didn't act on it "
+                  + "and no tools were called. Nothing was submitted. Try again without the instructions aimed at the system."
+                : "Azure OpenAI's content filter refused this conversation as a likely prompt injection, after I had already called "
+                  + string.Join(", ", called) + ". Ask me to list your expenses to see where things stand.";
+        }
+    }
+
+    /// <summary>An MCP tool that records its name each time the model calls it.</summary>
+    private sealed class RecordingTool(AIFunction tool, List<string> called) : DelegatingAIFunction(tool)
+    {
+        protected override ValueTask<object?> InvokeCoreAsync(AIFunctionArguments arguments, CancellationToken cancellationToken)
+        {
+            lock (called) called.Add(Name);
+            return base.InvokeCoreAsync(arguments, cancellationToken);
+        }
     }
 
     private static List<ToolCallTrace> TraceToolCalls(Microsoft.Extensions.AI.ChatResponse response)
