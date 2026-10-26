@@ -1,4 +1,5 @@
 using Mcp2Oauth.McpServer;
+using Mcp2Oauth.McpServer.Audit;
 using Mcp2Oauth.McpServer.Data;
 using Mcp2Oauth.McpServer.Identity;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -51,6 +52,8 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IUserContext, HttpUserContext>();
 builder.Services.AddSingleton<CallerTelemetry>();
 builder.Services.AddSingleton<ExpenseStore>();
+builder.Services.AddSingleton<AuditLog>();
+builder.Services.AddScoped<ExpenseAudit>();
 builder.Services.AddSingleton(TimeProvider.System);
 
 builder.Services.AddMcpServer(options =>

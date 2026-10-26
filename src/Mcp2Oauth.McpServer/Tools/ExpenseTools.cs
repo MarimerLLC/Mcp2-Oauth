@@ -1,18 +1,20 @@
 using System.ComponentModel;
+using Mcp2Oauth.McpServer.Audit;
 using Mcp2Oauth.McpServer.Data;
 using Mcp2Oauth.McpServer.Identity;
 using Microsoft.AspNetCore.Authorization;
-using ModelContextProtocol;
 using ModelContextProtocol.Server;
 
 namespace Mcp2Oauth.McpServer.Tools;
 
 /// <summary>
 /// Tools that act on the OBO user's data. They depend only on
-/// <see cref="IUserContext"/>, never on which agent made the call.
+/// <see cref="IUserContext"/>, never on which agent made the call. Every
+/// submission and approval, including refused ones, goes to the audit trail
+/// through <see cref="ExpenseAudit"/>, which adds the agent identity itself.
 /// </summary>
 [McpServerToolType]
-public sealed class ExpenseTools(IUserContext userContext, ExpenseStore store)
+public sealed class ExpenseTools(IUserContext userContext, ExpenseStore store, ExpenseAudit audit)
 {
     [McpServerTool(Name = "list_my_expenses", ReadOnly = true)]
     [Authorize(Policy = Policies.OnBehalfOfUser)]
@@ -28,12 +30,13 @@ public sealed class ExpenseTools(IUserContext userContext, ExpenseStore store)
         [Description("Amount in USD.")] decimal amount)
     {
         if (string.IsNullOrWhiteSpace(description))
-            throw new McpException("A description is required.");
+            throw audit.Denied(AuditAction.SubmitExpense, "A description is required.", amount: amount);
         if (amount is <= 0 or > 10_000)
-            throw new McpException("Amount must be between 0 and 10,000 USD.");
+            throw audit.Denied(AuditAction.SubmitExpense, "Amount must be between 0 and 10,000 USD.", amount: amount);
 
         var user = userContext.User;
-        return store.Add(user.ObjectId, user.Name ?? user.UserName ?? user.ObjectId, description, amount);
+        var expense = store.Add(user.ObjectId, user.Name ?? user.UserName ?? user.ObjectId, description, amount);
+        return audit.Succeeded(AuditAction.SubmitExpense, expense);
     }
 
     [McpServerTool(Name = "list_pending_approvals", ReadOnly = true)]
@@ -48,12 +51,14 @@ public sealed class ExpenseTools(IUserContext userContext, ExpenseStore store)
     public Expense ApproveExpense([Description("The expense id.")] int id)
     {
         var user = userContext.User;
-        var expense = store.Find(id) ?? throw new McpException($"Expense {id} was not found.");
+        var expense = store.Find(id)
+            ?? throw audit.Denied(AuditAction.ApproveExpense, $"Expense {id} was not found.", expenseId: id);
         if (expense.OwnerObjectId == user.ObjectId)
-            throw new McpException("You can't approve your own expense.");
+            throw audit.Denied(AuditAction.ApproveExpense, "You can't approve your own expense.", expense);
         if (expense.Status != ExpenseStatus.Pending)
-            throw new McpException($"Expense {id} is already {expense.Status}.");
+            throw audit.Denied(AuditAction.ApproveExpense, $"Expense {id} is already {expense.Status}.", expense);
 
-        return store.Approve(id, user.Name ?? user.UserName ?? user.ObjectId);
+        var approved = store.Approve(id, user.Name ?? user.UserName ?? user.ObjectId);
+        return audit.Succeeded(AuditAction.ApproveExpense, approved);
     }
 }

@@ -19,11 +19,17 @@ public static class Policies
     /// <summary>App role assigned to users (in Entra) who may approve expenses.</summary>
     public const string ApproverUserRole = "Expense.Approver";
 
+    /// <summary>App role assigned to users (in Entra) who may read the audit log.</summary>
+    public const string AuditorUserRole = "Expense.Auditor";
+
     /// <summary>The caller is an agent acting on behalf of a user.</summary>
     public const string OnBehalfOfUser = nameof(OnBehalfOfUser);
 
     /// <summary>The OBO user holds the Expense.Approver role.</summary>
     public const string Approver = nameof(Approver);
+
+    /// <summary>The OBO user holds the Expense.Auditor role.</summary>
+    public const string Auditor = nameof(Auditor);
 
     /// <summary>Either an OBO call, or an app-only agent with the status permission.</summary>
     public const string StatusReader = nameof(StatusReader);
@@ -37,6 +43,10 @@ public static class Policies
         options.AddPolicy(Approver, p => p
             .Combine(options.GetPolicy(OnBehalfOfUser)!)
             .RequireAssertion(c => c.User.GetRoles().Contains(ApproverUserRole)));
+
+        options.AddPolicy(Auditor, p => p
+            .Combine(options.GetPolicy(OnBehalfOfUser)!)
+            .RequireAssertion(c => c.User.GetRoles().Contains(AuditorUserRole)));
 
         options.AddPolicy(StatusReader, p => p
             .RequireAuthenticatedUser()

@@ -14,7 +14,8 @@ public sealed class AgentService(McpConnector connector, IServiceProvider servic
     private const string SystemPrompt =
         """
         You are an expense assistant. Use the available tools to answer questions about
-        the user's expense reports, submit new ones, and handle approvals. If a tool
+        the user's expense reports, submit new ones, handle approvals, and review the
+        audit log. If a tool
         isn't available or fails with an authorization error, say so plainly; don't guess.
         When asked who you are or who the user is, call the whoami tool.
         """;

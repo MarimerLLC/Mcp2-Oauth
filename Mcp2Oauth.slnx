@@ -7,4 +7,7 @@
     <Project Path="src/Mcp2Oauth.ServiceDefaults/Mcp2Oauth.ServiceDefaults.csproj" />
     <Project Path="src/Mcp2Oauth.WebUI/Mcp2Oauth.WebUI.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Mcp2Oauth.McpServer.Tests/Mcp2Oauth.McpServer.Tests.csproj" />
+  </Folder>
 </Solution>
