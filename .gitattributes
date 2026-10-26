@@ -1,0 +1,83 @@
+###############################################################################
+# Normalize line endings: store LF in the repo, check out with the platform's
+# native ending, unless overridden below.
+###############################################################################
+* text=auto
+
+###############################################################################
+# Source and config files (normalized; native endings on checkout)
+###############################################################################
+*.cs        text diff=csharp
+*.csx       text diff=csharp
+*.razor     text
+*.cshtml    text
+*.xaml      text
+*.json      text
+*.jsonc     text
+*.xml       text
+*.config    text
+*.props     text
+*.targets   text
+*.resx      text
+*.ruleset   text
+.editorconfig  text
+*.md        text diff=markdown
+*.txt       text
+*.yml       text
+*.yaml      text
+*.http      text
+*.html      text diff=html
+*.css       text diff=css
+*.js        text
+*.ts        text
+
+# Project files
+*.csproj    text
+*.vbproj    text
+*.fsproj    text
+*.dbproj    text
+*.proj      text
+*.slnx      text
+
+###############################################################################
+# Files that must keep a specific line ending
+###############################################################################
+# Visual Studio expects CRLF in solution files
+*.sln       text eol=crlf
+
+# Windows scripts
+*.cmd       text eol=crlf
+*.bat       text eol=crlf
+*.ps1       text eol=crlf
+*.psm1      text eol=crlf
+*.psd1      text eol=crlf
+
+# Unix scripts and container files
+*.sh        text eol=lf
+Dockerfile  text eol=lf
+*.dockerfile text eol=lf
+
+###############################################################################
+# Binary files (no normalization or text diff)
+###############################################################################
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.ico       binary
+*.bmp       binary
+*.webp      binary
+*.pdf       binary
+*.zip       binary
+*.7z        binary
+*.dll       binary
+*.exe       binary
+*.pdb       binary
+*.snk       binary
+*.pfx       binary
+*.p12       binary
+*.woff      binary
+*.woff2     binary
+*.ttf       binary
+*.eot       binary
+*.nupkg     binary
