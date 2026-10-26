@@ -1,0 +1,46 @@
+<h3 class="h6">Agent <span class="text-muted small">(attested by Entra via <code>azp</code>)</span></h3>
+<dl class="row small">
+    <dt class="col-4">Name</dt>
+    <dd class="col-8">@(Identity.Agent.DisplayName ?? "(unknown)")</dd>
+    <dt class="col-4">App id</dt>
+    <dd class="col-8"><code>@Identity.Agent.AppId</code></dd>
+    <dt class="col-4">Allowed</dt>
+    <dd class="col-8">@(Identity.Agent.IsAllowed ? "Yes" : "No")</dd>
+    @if (Identity.AppRoles.Count > 0)
+    {
+        <dt class="col-4">App roles</dt>
+        <dd class="col-8">@string.Join(", ", Identity.AppRoles)</dd>
+    }
+</dl>
+
+<h3 class="h6">On behalf of</h3>
+@if (Identity.User is { } user)
+{
+    <dl class="row small">
+        <dt class="col-4">Name</dt>
+        <dd class="col-8">@user.Name</dd>
+        <dt class="col-4">User name</dt>
+        <dd class="col-8">@user.UserName</dd>
+        <dt class="col-4">Object id</dt>
+        <dd class="col-8"><code>@user.ObjectId</code></dd>
+        <dt class="col-4">Roles</dt>
+        <dd class="col-8">@(user.Roles.Count > 0 ? string.Join(", ", user.Roles) : "(none)")</dd>
+        <dt class="col-4">Scopes</dt>
+        <dd class="col-8">@string.Join(" ", Identity.DelegatedScopes)</dd>
+    </dl>
+}
+else
+{
+    <p class="small">Nobody. This is an app-only token, so user-scoped tools are hidden and refused.</p>
+}
+
+@if (Identity.ClientInfo is { } client)
+{
+    <h3 class="h6">clientInfo <span class="text-muted small">(self-asserted in <code>_meta</code>)</span></h3>
+    <p class="small mb-0"><code>@client.Name</code> @client.Version</p>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public IdentityReport Identity { get; set; } = default!;
+}

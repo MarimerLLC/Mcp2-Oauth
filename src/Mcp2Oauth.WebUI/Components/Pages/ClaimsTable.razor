@@ -1,0 +1,22 @@
+<table class="table table-sm claims">
+    <tbody>
+        @foreach (var claim in Claims)
+        {
+            <tr class="@(Highlight.Contains(claim.Key) ? "table-info" : null)">
+                <th><code>@claim.Key</code></th>
+                <td>@claim.Value</td>
+            </tr>
+        }
+    </tbody>
+</table>
+<p class="small text-muted mb-0">
+    Highlighted: <code>azp</code> identifies the agent; <code>oid</code>, <code>scp</code> and <code>roles</code>
+    describe the user (OBO) or the agent's app permissions (agent only).
+</p>
+
+@code {
+    private static readonly HashSet<string> Highlight = ["azp", "appid", "idtyp", "oid", "scp", "roles"];
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<KeyValuePair<string, string>> Claims { get; set; } = [];
+}

@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Mcp2Oauth.Agent/Mcp2Oauth.Agent.csproj" />
+    <Project Path="src/Mcp2Oauth.Contracts/Mcp2Oauth.Contracts.csproj" />
+    <Project Path="src/Mcp2Oauth.McpServer/Mcp2Oauth.McpServer.csproj" />
+    <Project Path="src/Mcp2Oauth.WebUI/Mcp2Oauth.WebUI.csproj" />
+  </Folder>
+</Solution>

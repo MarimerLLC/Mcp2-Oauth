@@ -1,0 +1,23 @@
+<ul class="list-unstyled mb-2">
+    @foreach (var tool in AllTools)
+    {
+        var visible = Tools.Contains(tool);
+        <li class="@(visible ? null : "text-muted text-decoration-line-through")">
+            <code>@tool</code>
+        </li>
+    }
+</ul>
+<p class="small text-muted mb-0">
+    The server filters <code>tools/list</code> with each tool's authorization policy.
+</p>
+
+@code {
+    private static readonly string[] AllTools =
+    [
+        "whoami", "get_service_status", "list_my_expenses", "submit_expense",
+        "list_pending_approvals", "approve_expense",
+    ];
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<string> Tools { get; set; } = [];
+}
