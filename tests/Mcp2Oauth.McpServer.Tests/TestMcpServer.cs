@@ -1,10 +1,12 @@
 using System.Text.Json;
+using Mcp2Oauth.McpServer.AutoApproval;
 using Mcp2Oauth.McpServer.Identity;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
 
@@ -14,9 +16,12 @@ namespace Mcp2Oauth.McpServer.Tests;
 /// Hosts the real MCP server in memory, with Entra token validation replaced by
 /// <see cref="TestAuthHandler"/>. Each test gets a fresh server, so the
 /// in-memory expense store and audit log start from their seed data.
+/// Pass a <paramref name="classifier"/> to turn the expense policy on with a fake
+/// decision model; without one the policy is off, as it is with no Foundry configured.
 /// </summary>
-public sealed class TestMcpServer : WebApplicationFactory<Program>
+public sealed class TestMcpServer(IExpenseClassifier? classifier = null) : WebApplicationFactory<Program>
 {
+    public const string ServerAppId = "00000000-0000-0000-0000-0000000000bb";
     public const string AgentAppId = "aaaaaaaa-0000-0000-0000-00000000a6e7";
     public const string AgentName = "Test Agent";
     public const string UnknownAgentAppId = "bbbbbbbb-0000-0000-0000-00000000bad0";
@@ -25,8 +30,9 @@ public sealed class TestMcpServer : WebApplicationFactory<Program>
     {
         builder.UseEnvironment("Testing");
         builder.UseSetting("AzureAd:TenantId", "00000000-0000-0000-0000-0000000000aa");
-        builder.UseSetting("AzureAd:ClientId", "00000000-0000-0000-0000-0000000000bb");
-        builder.UseSetting("AzureAd:Audience", "api://00000000-0000-0000-0000-0000000000bb");
+        builder.UseSetting("AzureAd:ClientId", ServerAppId);
+        builder.UseSetting("AzureAd:Audience", $"api://{ServerAppId}");
+        builder.UseSetting("ExpensePolicy:Deployment", "decision-test");
         builder.UseSetting($"McpServer:AllowedAgents:{AgentAppId}", AgentName);
 
         builder.ConfigureTestServices(services =>
@@ -35,6 +41,12 @@ public sealed class TestMcpServer : WebApplicationFactory<Program>
                 .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestAuthHandler.SchemeName, null);
             services.PostConfigure<AuthenticationOptions>(options =>
                 options.DefaultAuthenticateScheme = TestAuthHandler.SchemeName);
+
+            if (classifier is not null)
+            {
+                services.RemoveAll<IExpenseClassifier>();
+                services.AddSingleton(classifier);
+            }
         });
     }
 

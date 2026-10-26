@@ -1,5 +1,6 @@
 using Mcp2Oauth.McpServer.Audit;
 using Mcp2Oauth.McpServer.Data;
+using Mcp2Oauth.McpServer.Tools;
 using ModelContextProtocol;
 
 namespace Mcp2Oauth.McpServer.Tests;
@@ -31,8 +32,12 @@ public sealed class AuditLogTests
         await using var server = new TestMcpServer();
         await using var employee = await server.ConnectAsync(TestToken.OnBehalfOf(TestUser.Employee));
 
-        var expense = await employee.CallAsync<Expense>("submit_expense", new() { ["description"] = "Team lunch", ["amount"] = 45m });
+        var submission = await employee.CallAsync<ExpenseSubmission>("submit_expense", new() { ["description"] = "Team lunch", ["amount"] = 45m });
+        var expense = submission.Expense;
 
+        // With no decision model configured, the expense policy stays out of it.
+        Assert.Equal(ExpenseStatus.Pending, expense.Status);
+        Assert.Equal("Waiting for a human approver.", submission.Approval);
         var entry = Assert.Single(await AuditTrailAsync(server, expense.Id));
         Assert.Equal(5, entry.Sequence);
         Assert.Equal(AuditAction.SubmitExpense, entry.Action);
@@ -41,6 +46,7 @@ public sealed class AuditLogTests
         Assert.Equal(TestUser.Employee.Name, entry.ExpenseOwner);
         Assert.Equal(new AuditActor(TestUser.Employee.ObjectId, TestUser.Employee.UserName), entry.User);
         Assert.Equal(Agent, entry.Agent);
+        Assert.Null(entry.Service);
         Assert.Null(entry.Reason);
         Assert.False(string.IsNullOrEmpty(entry.TraceId));
     }
@@ -94,7 +100,7 @@ public sealed class AuditLogTests
     {
         await using var server = new TestMcpServer();
         await using var approver = await server.ConnectAsync(TestToken.OnBehalfOf(TestUser.Approver));
-        var expense = await approver.CallAsync<Expense>("submit_expense", new() { ["description"] = "Hotel", ["amount"] = 310m });
+        var expense = (await approver.CallAsync<ExpenseSubmission>("submit_expense", new() { ["description"] = "Hotel", ["amount"] = 310m })).Expense;
 
         var error = await approver.CallExpectingErrorAsync("approve_expense", new() { ["id"] = expense.Id });
 
