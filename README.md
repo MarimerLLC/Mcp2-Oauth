@@ -163,3 +163,7 @@ tool loop.
   distributed cache. Consider
   [Microsoft Entra Agent ID](https://learn.microsoft.com/entra/agent-id/) for
   first-class agent identities.
+
+## License
+
+[MIT](LICENSE)
