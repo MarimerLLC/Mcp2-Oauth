@@ -5,3 +5,5 @@ components.d.ts
 *.local
 slides-export.pdf
 slides-export.pptx
+# Copied from ../src by scripts/sync-snippets.mjs
+snippets/

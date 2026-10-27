@@ -3,8 +3,11 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "node scripts/sync-snippets.mjs",
     "dev": "slidev --open",
+    "prebuild": "node scripts/sync-snippets.mjs",
     "build": "slidev build",
+    "preexport": "node scripts/sync-snippets.mjs",
     "export": "slidev export"
   },
   "dependencies": {
