@@ -1,0 +1,191 @@
+@import url('https://fonts.googleapis.com/css2?family=Alegreya:ital,wght@0,400;0,500;0,700;0,800;1,400;1,500&family=UnifrakturCook:wght@700&display=swap');
+
+/*
+  Techorama 2026 "Medieval Edition" look, rebuilt from the PowerPoint template.
+  Titles use DS Wallau when it is installed locally, else UnifrakturCook from Google Fonts.
+*/
+:root {
+  --gtg-rust: #8b2a22;
+  --gtg-rust-light: #c4513f;
+  --gtg-amber: #e0861a;
+  --gtg-gold: #e8a33d;
+  --gtg-green: #3e6b35;
+  --gtg-card: #f3f0eb;
+  --gtg-ink: #1a1a1a;
+  --gtg-muted: #555049;
+  --gtg-panel: #1e1e1e;
+  --gtg-panel-2: #2b2b2b;
+  --gtg-title-font: 'DS Wallau', 'UnifrakturCook', serif;
+  --gtg-body-font: 'Alegreya', Georgia, serif;
+  --gtg-mono-font: Consolas, 'Cascadia Mono', 'Courier New', monospace;
+}
+
+.gtg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  font-family: var(--gtg-body-font);
+  color: var(--gtg-ink);
+  font-size: 19px;
+  line-height: 1.4;
+}
+
+.gtg h1.gtg-title {
+  font-family: var(--gtg-title-font);
+  font-weight: 700;
+  font-size: 56px;
+  line-height: 1.05;
+  margin: 0;
+  letter-spacing: 0.01em;
+}
+
+.gtg .gtg-subtitle {
+  font-style: italic;
+  font-size: 23px;
+  color: var(--gtg-rust);
+  margin: 6px 0 0;
+}
+
+.gtg code,
+.gtg .mono {
+  font-family: var(--gtg-mono-font);
+}
+
+.gtg h3 {
+  font-weight: 700;
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+/* Margin resets stay at zero specificity so UnoCSS spacing utilities win. */
+:where(.gtg) h3,
+:where(.gtg) p {
+  margin: 0;
+}
+
+.gtg .muted {
+  color: var(--gtg-muted);
+}
+
+.gtg .rust {
+  color: var(--gtg-rust);
+}
+
+.gtg .green {
+  color: var(--gtg-green);
+}
+
+.gtg .amber {
+  color: var(--gtg-gold);
+}
+
+.gtg .sep {
+  font-size: 0.8em;
+  opacity: 0.6;
+  padding: 0 0.25em;
+}
+
+/* Content area shared by the light and dark layouts. */
+.gtg .gtg-body {
+  position: absolute;
+  top: 178px;
+  left: 74px;
+  right: 74px;
+  bottom: 60px;
+}
+
+/* Cards and banners */
+.gtg .card {
+  background: var(--gtg-card);
+  border-radius: 14px;
+  padding: 22px 24px;
+}
+
+.gtg .banner {
+  background: var(--gtg-rust);
+  color: #fff;
+  border-radius: 8px;
+  padding: 20px 24px;
+}
+
+.gtg .label {
+  font-weight: 700;
+  font-size: 15px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--gtg-gold);
+}
+
+:where(.gtg) ul.bullets {
+  margin: 0;
+  padding-left: 1.1em;
+  list-style: disc;
+}
+
+.gtg ul.bullets li {
+  margin: 0 0 6px;
+  padding-left: 0.2em;
+}
+
+/* Dark code panels. Shiki output goes inside with its own background removed. */
+.gtg .panel {
+  background: var(--gtg-panel);
+  color: #d4d4d4;
+  border-radius: 20px;
+  padding: 18px 24px;
+}
+
+.gtg .panel .slidev-code-wrapper {
+  margin: 10px 0 0;
+}
+
+.gtg .panel .slidev-code {
+  background: transparent !important;
+  padding: 0 !important;
+  font-family: var(--gtg-mono-font) !important;
+  font-size: 15.5px !important;
+  line-height: 1.45 !important;
+}
+
+.gtg .panel .slidev-code-copy {
+  display: none;
+}
+
+/* Arrows between boxes */
+.gtg .arrow-right,
+.gtg .arrow-left,
+.gtg .arrow-down {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #5a524a;
+  font-size: 24px;
+  line-height: 1;
+}
+
+/* Dark layout overrides */
+.gtg.dark {
+  color: #e9e4dc;
+}
+
+.gtg.dark h1.gtg-title {
+  color: #fff;
+}
+
+.gtg.dark .gtg-subtitle {
+  color: var(--gtg-gold);
+}
+
+.gtg.dark .muted {
+  color: #b9b2a8;
+}
+
+.gtg.dark .card {
+  background: #2a2a2a;
+}
+
+.gtg a.link {
+  color: var(--gtg-gold);
+  border-bottom: 1px solid var(--gtg-gold);
+  text-decoration: none;
+}
