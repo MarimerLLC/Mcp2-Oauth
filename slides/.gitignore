@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.slidev/
+components.d.ts
+*.local
+slides-export.pdf
+slides-export.pptx
