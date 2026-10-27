@@ -31,30 +31,25 @@ title: Beyond the toy tool
 subtitle: Every castle has a side door
 ---
 
-<div class="w-[745px] flex flex-col">
-  <div class="demo-box">
-    <div class="label">The demo <span class="sep">✕</span> <span class="normal-case">harmless, charming, useless in production</span></div>
+<div class="w-[760px]">
+<div class="demo-box">
 
+````md magic-move
 ```csharp
+// The demo: harmless, charming, useless in production
 [McpServerTool, Description("Gets the weather")]
 public string GetWeather(string city) => ...
 ```
-
-  </div>
-  <div v-click class="flex flex-col">
-    <div class="flex justify-center py-1"><FlowArrow dir="down" color="#a3362b" :length="44" /></div>
-    <div class="demo-box">
-      <div class="label">Monday morning <span class="sep">✕</span> <span class="normal-case">same shape, real data</span></div>
-
 ```csharp
+// Monday morning: same shape, real data
 [McpServerTool, Description("Finds customers")]
 public Customer[] GetCustomer(string query) => ...
 ```
+````
 
-  </div>
-  </div>
-  <p v-click class="text-[22px] text-[#bdb5aa] mt-5">Who can call it? &nbsp;What comes back? &nbsp;Who knows it happened?</p>
-  <p v-click class="question">How do we expose real capabilities to agents without building an ungoverned side door?</p>
+</div>
+<p v-click class="text-[22px] text-[#bdb5aa] mt-10">Who can call it? &nbsp;What comes back? &nbsp;Who knows it happened?</p>
+<p v-click class="question">How do we expose real capabilities to agents without building an ungoverned side door?</p>
 </div>
 
 <img src="/img/lady-window.png" alt="A lady in a pointed hat looking out of a castle window" class="absolute right-[-30px] bottom-[-34px] h-[400px]">
@@ -62,16 +57,19 @@ public Customer[] GetCustomer(string query) => ...
 <style>
 .demo-box {
   background: #1c1c1c;
-  padding: 16px 24px 18px;
+  padding: 22px 28px 24px;
+  margin-top: 30px;
 }
-.demo-box .slidev-code-wrapper { margin: 10px 0 0; }
-.demo-box .slidev-code {
+/* Slide styles are scoped; :deep reaches into the Magic Move component. */
+.demo-box :deep(pre),
+.demo-box :deep(.slidev-code) {
   background: transparent !important;
   padding: 0 !important;
+  margin: 0 !important;
   font-family: var(--gtg-mono-font) !important;
-  font-size: 18px !important;
+  font-size: 21px !important;
+  line-height: 1.5 !important;
 }
-.demo-box .slidev-code-copy { display: none; }
 .question {
   color: var(--gtg-rust-light);
   font-weight: 700;
@@ -184,7 +182,7 @@ subtitle: Hand out a key to one door, not the master key
   </div>
   <Panel label="C# ✕ MCP C# SDK" class="h-[460px]">
 
-```csharp
+```csharp {all|1-2|4-5|6-7|8-11|12}
 [McpServerToolType]
 public sealed class OrderTools(IOrderService orders)
 {
@@ -384,7 +382,7 @@ subtitle: Know the messenger, and the lord who sent them
   </div>
   <Panel label="Access token claims" class="h-[456px]">
 
-```jsonc
+```jsonc {all|5-8|10-12}
 {
   "aud": "api://orders-mcp",
   "tid": "9188040d-6c67-4c5b",
@@ -659,7 +657,7 @@ subtitle: Keep the royal chronicle
   </div>
   <Panel label="Audit record" class="h-[456px]">
 
-```json
+```json {all|4-9|10-11|3}
 {
   "timestamp": "2026-11-04T14:32:07Z",
   "correlationId": "7f3c2e91",
@@ -696,7 +694,7 @@ subtitle: Lanterns on every tower, one watch for the whole keep
   </div>
   <Panel label="OpenTelemetry setup" class="h-[456px] otel">
 
-```csharp
+```csharp {all|3-7,14-16|8-10,17-19|11|12}
 builder.Services.AddOpenTelemetry()
   .ConfigureResource(r => r.AddService("orders-mcp"))
   .WithTracing(t => t
@@ -727,6 +725,157 @@ McpTelemetry.ToolCalls.Add(1,
 
 <!--
 If you can't see it, security won't approve it. Trace each call end to end with OpenTelemetry so an agent action can be followed into your domain layer and database. Track the metrics that reveal misuse: denial counts, error rates, and drift in which tools get called. Then keep a real audit trail, separate from operational logs, append-only, with its own retention. Each record captures the user, the agent, the tool and version, redacted arguments, the policy decision, and the outcome. This is what lets you answer 'what did the agent do on behalf of this user last Tuesday?'
+-->
+
+---
+title: Hardening one tool
+subtitle: From side door to gatehouse, one click at a time
+---
+
+<div class="grid grid-cols-[1fr_330px] gap-[28px]">
+<Panel label="C# ✕ one refund tool, five gates" class="h-[482px] harden">
+
+````md magic-move
+```csharp
+[McpServerTool, Description("Does refunds")]
+public string Refund(string request) => db.Execute(request);
+```
+```csharp
+[McpServerTool(Name = "request_refund", Destructive = true)]
+[Description("Requests a refund on ONE order the caller can access. " +
+    "Large refunds wait for a human approver.")]
+public async Task<RefundResult> RequestRefund(
+    [Description("Order number, e.g. SO-104233")] string orderNumber,
+    [Description("Amount in EUR, at most the order total")] decimal amount,
+    [Description("The customer's reason")] string reason,
+    CancellationToken ct)
+{
+    return await refunds.CommitAsync(orderNumber, amount, reason, ct);
+}
+```
+```csharp
+[McpServerTool(Name = "request_refund", Destructive = true)]
+[Authorize(Policy = Policies.RefundRequester)]
+[Description("Requests a refund on ONE order the caller can access. " +
+    "Large refunds wait for a human approver.")]
+public async Task<RefundResult> RequestRefund(
+    [Description("Order number, e.g. SO-104233")] string orderNumber,
+    [Description("Amount in EUR, at most the order total")] decimal amount,
+    [Description("The customer's reason")] string reason,
+    CancellationToken ct)
+{
+    return await refunds.CommitAsync(orderNumber, amount, reason, ct);
+}
+```
+```csharp
+[McpServerTool(Name = "request_refund", Destructive = true)]
+[Authorize(Policy = Policies.RefundRequester)]
+[Description("Requests a refund on ONE order the caller can access. " +
+    "Large refunds wait for a human approver.")]
+public async Task<RefundResult> RequestRefund(
+    [Description("Order number, e.g. SO-104233")] string orderNumber,
+    [Description("Amount in EUR, at most the order total")] decimal amount,
+    [Description("The customer's reason")] string reason,
+    CancellationToken ct)
+{
+    if (amount <= 0)
+        throw new McpException("Amount must be greater than zero.");
+
+    return await refunds.CommitAsync(orderNumber, amount, reason, ct);
+}
+```
+```csharp
+[McpServerTool(Name = "request_refund", Destructive = true)]
+[Authorize(Policy = Policies.RefundRequester)]
+[Description("Requests a refund on ONE order the caller can access. " +
+    "Large refunds wait for a human approver.")]
+public async Task<RefundResult> RequestRefund(
+    [Description("Order number, e.g. SO-104233")] string orderNumber,
+    [Description("Amount in EUR, at most the order total")] decimal amount,
+    [Description("The customer's reason")] string reason,
+    CancellationToken ct)
+{
+    if (amount <= 0)
+        throw new McpException("Amount must be greater than zero.");
+
+    var draft = await refunds.DraftAsync(orderNumber, amount, reason, ct);
+    var decision = await policy.EvaluateAsync(draft, ct);
+    if (!decision.Allowed)
+        return RefundResult.Pending(draft, decision.Reason);
+
+    return await refunds.CommitAsync(draft, ct);
+}
+```
+```csharp
+[McpServerTool(Name = "request_refund", Destructive = true)]
+[Authorize(Policy = Policies.RefundRequester)]
+[Description("Requests a refund on ONE order the caller can access. " +
+    "Large refunds wait for a human approver.")]
+public async Task<RefundResult> RequestRefund(
+    [Description("Order number, e.g. SO-104233")] string orderNumber,
+    [Description("Amount in EUR, at most the order total")] decimal amount,
+    [Description("The customer's reason")] string reason,
+    CancellationToken ct)
+{
+    if (amount <= 0)
+        throw audit.Denied("Amount must be greater than zero.");
+
+    var draft = await refunds.DraftAsync(orderNumber, amount, reason, ct);
+    var decision = await policy.EvaluateAsync(draft, ct);
+    if (!decision.Allowed)
+        return audit.Referred(RefundResult.Pending(draft, decision.Reason));
+
+    return audit.Succeeded(await refunds.CommitAsync(draft, ct));
+}
+```
+````
+
+</Panel>
+<div class="flex flex-col gap-[10px]">
+  <div class="hstep" :class="{ on: $clicks >= 1, now: $clicks === 1 }"><span class="n">1</span><div><b>Narrow, typed, described</b><p>Contracts in, contracts out</p></div></div>
+  <div class="hstep" :class="{ on: $clicks >= 2, now: $clicks === 2 }"><span class="n">2</span><div><b>Authorized per tool</b><p>Identity and least privilege</p></div></div>
+  <div class="hstep" :class="{ on: $clicks >= 3, now: $clicks === 3 }"><span class="n">3</span><div><b>Rejects with a fixable error</b><p>Safe errors and redaction</p></div></div>
+  <div class="hstep" :class="{ on: $clicks >= 4, now: $clicks === 4 }"><span class="n">4</span><div><b>Policy decides, not the model</b><p>Reads vs. side effects</p></div></div>
+  <div class="hstep" :class="{ on: $clicks >= 5, now: $clicks === 5 }"><span class="n">5</span><div><b>Every outcome on the record</b><p>Audit and accountability</p></div></div>
+</div>
+</div>
+
+<style>
+.harden :deep(pre),
+.harden :deep(.slidev-code) {
+  font-size: 14px !important;
+  line-height: 1.4 !important;
+}
+.hstep {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding: 12px 16px;
+  border-radius: 12px;
+  opacity: 0.35;
+  transition: opacity 0.3s, background-color 0.3s;
+}
+.hstep.on { opacity: 1; }
+.hstep.now { background: var(--gtg-card); }
+.hstep .n {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--gtg-amber);
+  color: #fff;
+  font-weight: 700;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.hstep b { font-size: 18.5px; }
+.hstep p { font-size: 16px; color: var(--gtg-muted); font-style: italic; }
+</style>
+
+<!--
+Let's put the last half hour into one tool. Here's the side door: a tool called Refund that takes a string and hands it to the database. Click. Now it's narrow and typed: one business operation, an order number, an amount, a reason, and a description written like a contract. Click. It's authorized per tool, so only callers who pass the refund policy can even see it. Click. Bad input comes back as an error the model can fix, not a stack trace. Click. The model proposes, the server's policy decides: large refunds come back pending for a human. Click. And every outcome, denied, referred or committed, lands in the audit trail with the user and the agent. Same tool, five gates.
 -->
 
 ---
@@ -837,6 +986,78 @@ Switch to the running sample. Sign in to the web UI, ask the agent for something
 -->
 
 ---
+title: One real tool, every gate
+subtitle: "From the sample: approve_expense, exactly as it ships"
+---
+
+<Panel label="src/Mcp2Oauth.McpServer/Tools/ExpenseTools.cs" class="sample">
+
+<<< @/snippets/ExpenseTools.cs#slide-approve-expense csharp {all|2|3-4|6|7-12|14-15}
+
+</Panel>
+
+<div class="grid grid-cols-5 gap-[12px] mt-[16px] sample-chips">
+  <div :class="{ now: $clicks === 1 }">Authorized per tool</div>
+  <div :class="{ now: $clicks === 2 }">Described, typed contract</div>
+  <div :class="{ now: $clicks === 3 }">Acts as the signed-in user</div>
+  <div :class="{ now: $clicks === 4 }">Refusals are audited tool errors</div>
+  <div :class="{ now: $clicks === 5 }">Success is audited too</div>
+</div>
+
+<style>
+.sample-chips > div {
+  background: var(--gtg-card);
+  border-radius: 10px;
+  padding: 10px 12px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 16.5px;
+  line-height: 1.2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.3s, color 0.3s;
+}
+.sample-chips > div.now {
+  background: var(--gtg-rust);
+  color: #fff;
+}
+</style>
+
+<!--
+Back from the demo: this is the real code behind what you just saw, pulled straight from the repo. One tool, every gate. The Authorize attribute names a policy: only an approver, acting through an agent on their own behalf, gets in. The description is the contract the model reads. The user comes from IUserContext, the on-behalf-of user, never the agent. Each refusal (not found, your own expense, already decided) throws an McpException, which the SDK returns as a tool error the model can explain, and audit.Denied records it first. And the approval itself is audited too, with both the user and the agent named.
+-->
+
+---
+title: Only the doors you can open
+subtitle: "From the sample: policies on tools, and a tools/list that honors them"
+---
+
+<div class="grid grid-cols-[786px_1fr] gap-[34px]">
+  <div class="flex flex-col gap-[16px]">
+    <Panel label="src/Mcp2Oauth.McpServer/Policies.cs" class="sample">
+
+<<< @/snippets/Policies.cs#slide-policies csharp {all|1-3|5-7}
+
+</Panel>
+    <Panel label="src/Mcp2Oauth.McpServer/Program.cs" class="sample">
+
+<<< @/snippets/Program.cs#slide-mcp-server csharp {all|6}
+
+</Panel>
+  </div>
+  <div class="flex flex-col gap-[30px] pt-1">
+    <Feature icon="key-lock" title="Acting for a user">The agent must call on behalf of a signed-in user, with the Mcp.Tools scope.</Feature>
+    <Feature icon="wax-seal" title="Plus an Entra role">Approver adds the Expense.Approver app role on top of the on-behalf-of check.</Feature>
+    <Feature icon="door" title="Hidden, not just denied">AddAuthorizationFilters() drops tools from tools/list when the caller fails their policy.</Feature>
+  </div>
+</div>
+
+<!--
+Here's where those policies live. OnBehalfOfUser says the agent must be calling for a signed-in user with the Mcp.Tools scope; an app-only call doesn't qualify. Approver combines that with the Expense.Approver role from Entra, so the user's own rights are the ceiling. Then one line in Program.cs: AddAuthorizationFilters. With it, the SDK applies those same policies to tools/list, so a regular user's agent never even sees approve_expense. It can't pick a tool it doesn't know exists. That's "show only usable doors", for real.
+-->
+
+---
 layout: dark
 title: Resources
 subtitle: Code from today, and the SDKs it builds on
@@ -900,7 +1121,7 @@ Everything from today is on GitHub: an MCP server behind Entra ID OAuth with per
 layout: end
 ---
 
-# QUESTIONS?
+# THANK YOU
 
 Rockford Lhotka <span class="sep">✕</span> blog.lhotka.net
 

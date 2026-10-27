@@ -64,6 +64,7 @@ builder.Services.AddHttpClient<IExpenseClassifier, DecisionModelClassifier>();
 builder.Services.AddScoped<ExpensePolicy>();
 builder.Services.AddSingleton(TimeProvider.System);
 
+// #region slide-mcp-server
 builder.Services.AddMcpServer(options =>
     {
         options.ServerInfo = new() { Name = "Mcp2Oauth.McpServer", Version = "1.0.0" };
@@ -71,6 +72,7 @@ builder.Services.AddMcpServer(options =>
     .WithHttpTransport()
     .AddAuthorizationFilters()
     .WithToolsFromAssembly();
+// #endregion
 
 var app = builder.Build();
 

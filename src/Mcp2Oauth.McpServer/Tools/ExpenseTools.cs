@@ -64,6 +64,7 @@ public sealed class ExpenseTools(IUserContext userContext, ExpenseStore store, E
     public IReadOnlyList<Expense> ListPendingApprovals() =>
         store.Pending().Where(e => e.OwnerObjectId != userContext.User.ObjectId).ToList();
 
+    // #region slide-approve-expense
     [McpServerTool(Name = "approve_expense")]
     [Authorize(Policy = Policies.Approver)]
     [Description("Approves a pending expense report. Requires the Expense.Approver role; you can't approve your own.")]
@@ -80,6 +81,7 @@ public sealed class ExpenseTools(IUserContext userContext, ExpenseStore store, E
         var approved = store.Approve(id, user.Name ?? user.UserName ?? user.ObjectId);
         return audit.Succeeded(AuditAction.ApproveExpense, approved);
     }
+    // #endregion
 }
 
 /// <summary>A new expense, and what happened to it: auto-approved, or waiting for a human.</summary>

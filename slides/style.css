@@ -189,3 +189,25 @@
   border-bottom: 1px solid var(--gtg-gold);
   text-decoration: none;
 }
+
+/* Magic Move renders its own <pre>; keep it on the panel's background like static code. */
+.gtg .panel pre {
+  background: transparent !important;
+  padding: 0 !important;
+  margin: 10px 0 0;
+  font-family: var(--gtg-mono-font) !important;
+}
+
+/* Panels showing real files from the sample: path as the caption, slightly smaller code. */
+.gtg .panel.sample .label {
+  text-transform: none;
+  font-family: var(--gtg-mono-font);
+  font-weight: 400;
+  font-size: 14px;
+  letter-spacing: 0;
+}
+
+.gtg .panel.sample .slidev-code {
+  font-size: 14px !important;
+  line-height: 1.42 !important;
+}

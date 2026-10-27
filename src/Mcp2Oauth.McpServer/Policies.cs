@@ -36,6 +36,7 @@ public static class Policies
 
     public static void Add(AuthorizationOptions options)
     {
+        // #region slide-policies
         options.AddPolicy(OnBehalfOfUser, p => p
             .RequireAuthenticatedUser()
             .RequireAssertion(c => c.User.IsDelegated() && c.User.GetScopes().Contains(ToolsScope)));
@@ -43,6 +44,7 @@ public static class Policies
         options.AddPolicy(Approver, p => p
             .Combine(options.GetPolicy(OnBehalfOfUser)!)
             .RequireAssertion(c => c.User.GetRoles().Contains(ApproverUserRole)));
+        // #endregion
 
         options.AddPolicy(Auditor, p => p
             .Combine(options.GetPolicy(OnBehalfOfUser)!)
